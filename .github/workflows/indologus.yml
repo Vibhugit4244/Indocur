@@ -1,0 +1,66 @@
+
+name: IndoLogus lecture PDF automation
+
+on:
+  schedule:
+    - cron: '30 8,15 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: indologus-automation
+  cancel-in-progress: false
+
+jobs:
+  process-new-videos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      YOUTUBE_CHANNEL_URL: https://www.youtube.com/@IndoLogus
+      MAX_VIDEOS_PER_RUN: '2'
+      WHISPER_MODEL: tiny
+      PYTHONUNBUFFERED: '1'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg tesseract-ocr
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate configuration
+        run: |
+          test -n "$TELEGRAM_BOT_TOKEN" || (echo "Missing TELEGRAM_BOT_TOKEN" && exit 1)
+          test -n "$TELEGRAM_CHAT_ID" || (echo "Missing TELEGRAM_CHAT_ID" && exit 1)
+
+      - name: Process new videos
+        run: python main.py
+
+      - name: Commit processing state
+        if: always()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add state/state.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Update processing state [skip ci]'
+            git push
+          fi
