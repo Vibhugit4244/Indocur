@@ -313,11 +313,15 @@ def process_video(video):
         telegram(status, str(pdf))
 
 
+
 def main():
     if not BOT_TOKEN or not CHAT_ID:
         raise RuntimeError("Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.")
 
+    telegram("✅ IndoLogus automation is running. Telegram delivery test successful.")
+
     state = load_state()
+
     processed = set(state.get("processed", []))
 
     try:
